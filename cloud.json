@@ -1,0 +1,25 @@
+{
+  "index_patterns": ["cloud-*"],
+  "template": {
+    "mappings": {
+      "properties": {
+        "@timestamp": {"type": "date"},
+        "host.name": {"type": "keyword"},
+        "event.category": {"type": "keyword"},
+        "event.action": {"type": "keyword"},
+        "event.outcome": {"type": "keyword"},
+        "event.type": {"type": "keyword"},
+        "event.provider": {"type": "keyword"},
+        "user.name": {"type": "keyword"},
+        "user.domain": {"type": "keyword"},
+        "source.ip": {"type": "ip"},
+        "o365.operation": {"type": "keyword"},
+        "o365.workload": {"type": "keyword"},
+        "email.rule.name": {"type": "keyword"},
+        "email.rule.condition": {"type": "keyword"},
+        "email.forwarding.target": {"type": "keyword"},
+        "message": {"type": "text"}
+      }
+    }
+  }
+}
