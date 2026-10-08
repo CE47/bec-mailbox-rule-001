@@ -1,0 +1,29 @@
+{
+  "name": "Inbox rule created or external forwarding enabled on a Microsoft 365 mailbox",
+  "description": "Lab rule for the CTIA bec-mailbox-rule-001 scenario. Mailbox configuration is the one thing a normal user almost never changes: in a whole day of tenant-wide Microsoft 365 audit for this lab, 39 records are Exchange records and exactly two of them are configuration changes. This rule fires on both kinds, one alert per matching log record, so the Business Email Compromise is caught the moment the attacker makes the mailbox survive their own sign-out - the inbox rule keeps filing the finance replies and the external forwarding keeps copying the mail, and neither needs the attacker to be logged in. The query is the same one the investigation uses, so the count the alert reports and the count you find by hand are the same number. Deliberately not scoped to a user or an address, because a takeover of any mailbox would have to raise it. The time window is deliberately long because this lab ships historical data - that is a lab-only concession, not a production setting; a real deployment would use a short window, alert on the newness of the rule name and the external destination domain, and treat the first configuration change of the day as high severity and a burst of them as critical.",
+  "type": "query",
+  "risk_score": 99,
+  "severity": "critical",
+  "tags": [
+    "ctia-lab",
+    "m365",
+    "business-email-compromise",
+    "mailbox-rule",
+    "exfiltration",
+    "persistence",
+    "detection-engineering"
+  ],
+  "enabled": true,
+  "interval": "1m",
+  "from": "now-365d",
+  "to": "now",
+  "index": [
+    "cloud-*"
+  ],
+  "timeField": "@timestamp",
+  "query": "(event.action: \"mailbox_rule_created\" or event.action: \"external_forwarding_enabled\")",
+  "language": "kuery",
+  "max_signals": 100,
+  "actions": [],
+  "notify_when": "onActiveAlert"
+}
