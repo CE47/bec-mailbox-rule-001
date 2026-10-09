@@ -776,7 +776,18 @@ if not "%CURLCODE%"=="200" (
   call :fail "Kibana refused to create the data view !DVPAT!, HTTP %CURLCODE%" "The log data is still loaded. Check  docker logs %SCEN%-kibana  and run this file again."
   exit /b 1
 )
-call :docurl -s -o "%WORK%\dv-find.json" %KBAUTH% "%KBURL%/api/saved_objects/_find?type=index-pattern^&search_fields=title^&search=!DVPAT!^&fields=title^&per_page=50"
+rem  The bare ampersands below are deliberate.  cmd.exe parses a line a second
+rem  time whenever CALL is used, and on that second pass a ^& has its caret
+rem  doubled, so the separator would reach curl as ^^ and Kibana would be handed
+rem  type=index-pattern^^search_fields=title^^... instead of four clean ones.
+rem  This line was not actually broken, and the reason is worth writing down:
+rem  a caret is only doubled on a call line that carries no ! in it, and the
+rem  !DVPAT! below suppresses that.  That is an accident of this line's shape,
+rem  not a rule - edit the pattern to a %EDVAR% and the URL breaks.  So the URL
+rem  is written with bare &, which is correct unconditionally.  See the longer
+rem  note in :esdocount, and setup-lab.sh, which sends the same URL with a plain
+rem  & and has no second pass.
+call :docurl -s -o "%WORK%\dv-find.json" %KBAUTH% "%KBURL%/api/saved_objects/_find?type=index-pattern&search_fields=title&search=!DVPAT!&fields=title&per_page=50"
 findstr /c:"!DVPAT!" "%WORK%\dv-find.json" >nul 2>&1
 if errorlevel 1 (
   echo  ERROR: the data view was created but the pattern "!DVPAT!" was not stored.
@@ -973,16 +984,41 @@ rem     %~3 is an optional query body.  Without it this is a plain count of
 rem     everything in the index; with one it counts only what matches, which is
 rem     how :mkrule asks "is this rule already installed" without needing a
 rem     response it would then have to take apart in batch.
+rem
+rem     The count URL is spelled out in full on both curl lines below and must
+rem     stay that way.  It carries two query parameters, and cmd.exe parses a
+rem     line a second time whenever CALL is used - once for the CALL itself and
+rem     once for the line handed to the subroutine.  On that second pass an
+rem     ampersand written as ^& has its caret doubled and reaches curl as ^^.
+rem     Elasticsearch then reads allow_no_indices as the value "true^^" and a
+rem     real 9.1 answers
+rem       HTTP 400  illegal_argument_exception
+rem                  Failed to parse value [true^^] as only [true] or [false]
+rem                  are allowed.
+rem     which surfaced as "could not read the document count of ...", aborted
+rem     step 7, and so left the rule uninstalled and the Alerts page empty.
+rem
+rem     This line used to hold the URL in EDCNTURL, built with a ^&, and the
+rem     caret was doubled on the way out of the variable just the same.  It is
+rem     worth knowing why :mkdataview got away with a ^& for so long and this
+rem     one did not: a caret is only doubled on a call line that has no ! in
+rem     it.  Delayed expansion changes how the line is re-parsed and swallows
+rem     the caret, so a ^& that happens to share a line with a !VAR! survives
+rem     by accident.  The _find line in :mkdataview carries !DVPAT! and was
+rem     therefore harmless; these two lines use %EDQ% and are inside an if/else
+rem     block, so nothing swallowed the caret.  A bare & typed inside the quoted
+rem     URL is the one form that is correct unconditionally, which is why both
+rem     URLs are written out here rather than kept in variables.  setup-lab.sh
+rem     sends the same URLs with a plain & and has no second pass at all.
 :esdocount
 set "EDIDX=%~1"
 set "EDVAR=%~2"
 set "EDQ=%~3"
-set "EDCNTURL=%ESURL%/%EDIDX%/_count?allow_no_indices=true^&filter_path=count"
 call :docurl -s -o nul -X POST %ESAUTH% "%ESURL%/%EDIDX%/_refresh"
 if defined EDQ (
-  call :docurl -s -o "%WORK%\cnt.json" %ESAUTH% -X POST -H "Content-Type: application/json" --data-binary "@%EDQ%" "%EDCNTURL%"
+  call :docurl -s -o "%WORK%\cnt.json" %ESAUTH% -X POST -H "Content-Type: application/json" --data-binary "@%EDQ%" "%ESURL%/%EDIDX%/_count?allow_no_indices=true&filter_path=count"
 ) else (
-  call :docurl -s -o "%WORK%\cnt.json" %ESAUTH% "%EDCNTURL%"
+  call :docurl -s -o "%WORK%\cnt.json" %ESAUTH% "%ESURL%/%EDIDX%/_count?allow_no_indices=true&filter_path=count"
 )
 if not "%CURLCODE%"=="200" (
   call :fail "could not read the document count of %EDIDX%, HTTP %CURLCODE%" "Nothing was changed."
